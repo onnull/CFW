@@ -1,153 +1,120 @@
-# 自选GEOIP数据库推荐使用: https://testingcf.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/country.mmdb
+#==========================================
 
-mixed-port: 7890      # 混合端口，HTTP和SOCKS5用一个端口
-allow-lan: true       # 允许局域网的连接（共享代理）
-bind-address: "*"     # 监听IP白名单，可绑定单个IPv4和v6地址，"*" 为绑定所有IP地址，仅在将allow-lan设置为true时适用
-                      
-
-ipv6: ture            # 开启 IPv6 总开关，关闭阻断所有 IPv6 链接和屏蔽 DNS 请求 AAAA 记录
-mode: rule            # 规则模式：rule（规则） / global（全局代理）/ direct（全局直连）/ script (脚本)
-log-level: info       # 设置日志输出级别 (5 个级别：silent / error / warning / info / debug）
-
-external-controller: 127.0.0.1:9090   # 外部控制器监听地址，可以使用 RESTful API 来控制你的 clash 内核
+port: 7890           # HTTP 代理端口
+socks-port: 7891     # Socks 端口
+redir-port: 7892     # Redir 端口
+mixed-port: 7893     # 混合端口
+allow-lan: true      # 允许局域网连接
+bind-address: "*"    # 地址绑定
+mode: rule           # 规则模式
+log-level: info      # 日志级别
+ipv6: false          # IPV6开关
+external-controller: 127.0.0.1:9090
 
 dns:
-  enable: true             # 关闭将使用系统 DNS
-  ipv6: true               # IPV6解析开关；如果为false，将返回ipv6结果为空
-  enhanced-mode: fake-ip   # 模式：redir-host或fake-ip
-  listen: 0.0.0.0:53       # DNS 监听地址
-  default-nameserver: [223.5.5.5, 119.29.29.29, 114.114.114.114]
-                                  # 解析非IP的dns用的dns服务器，只支持纯IP，（Meta可为其加密）
-  fake-ip-range: 198.18.0.1/16    # Fake-IP 解析地址池
-  fake-ip-filter: ['+.lan', 'localhost.ptlogin2.qq.com', '*.battle.net', '*.blzstatic.cn', '*.battlenet.com', '*.battlenet.com.cn', 'lens.l.google.com', '+.srv.nintendo.net', '+.stun.playstation.net', '+.msftncsi.com', '+.xboxlive.com', 'msftconnecttest.com', 'xbox.*.*.microsoft.com', 'xbox.*.microsoft.com', '+.msftconnecttest.com', '*.msftncsi.com', '*.msftconnecttest.com', '*.mcdn.bilivideo.cn']
-                                  # Fake-ip 过滤，列表中的域名返回真实IP
+  enable: true       # 不使用系统 DNS
+  ipv6: false        # 关闭 IPV6
+  listen: 0.0.0.0:53 # dns 监听
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  fake-ip-filter:
+    - "*.lan"
+    - localhost.ptlogin2.qq.com
+    - +.srv.nintendo.net
+    - +.stun.playstation.net
+    - +.msftconnecttest.com
+    - +.msftncsi.com
+    - +.xboxlive.com
+    - msftconnecttest.com
+    - xbox.*.microsoft.com
+    - "*.battlenet.com.cn"
+    - "*.battlenet.com"
+    - "*.blzstatic.cn"
+    - "*.battle.net"
+  nameserver:        # 默认 DNS 服务
+    - 223.5.5.5
+    - 119.29.29.29
+  fallback:          # 国外 DNS 服务器
+    - https://cloudflare-dns.com/dns-query
+    - https://dns.google/dns-query
+    - https://dns.alidns.com/dns-query
+  fallback-filter:
+    geoip: true
+    geoip-code: CN
+    ipcidr:
+      - 240.0.0.0/4
+#========= 建立锚点 =========#
 
-###锚点###
+# 策略组引用
+pr:   &a3 {type: select,   proxies: [HK, JP, US, TW, SG, DIRECT, REJECT]}
+p:    &a1 {type: http,     interval: 86400,  health-check: {enable: true, url: http://www.gstatic.com/generate_204, interval: 1800} }
+use:  &a2 {type: select,   use: [Subscribe] }
+c:    &a6 {type: http,     behavior: classical, interval: 86400}
+d:    &a5 {type: http,     behavior: domain,    interval: 86400}
+i:    &a7 {type: http,     behavior: ipcidr,    interval: 86400}
 
-# 规则行为相关
-c: &c {type: http, behavior: classical, interval: 86400}
+proxy-providers:
+  Subscribe:
+    <<: *a1
+    url: https://texon.io/portal/subscribe/1044/qZviaDqIahI/clash/
+    # URL后面填写格式1[单一订阅]: 直接填写你的机场Clash订阅[推荐此种方式，避免订阅泄露]
+    # URL后面填写格式2[多个订阅]：https://api.nexconvert.com/sub?target=clash&url=请手动填入你的订阅(多机场订阅用|分割即可)&emoji=true&list=true&new_name=true&udp=false
+    path: ./proxy_providers/tmp.yaml
+    
+proxies: null
+proxy-groups:
+#分流分组
+  - {name: Final, <<: *a3}
+  - {name: Emby, <<: *a3}
+  - {name: OpenAi, <<: *a3}
+  - {name: Google, <<: *a3}
+  - {name: Telegram, <<: *a3}
+  - {name: Steam, <<: *a3}
+  - {name: Bahamut, <<: *a3}
+  - {name: AdBlock, <<: *a3}
 
-d: &d {type: http, behavior: domain, interval: 86400}
-# 远程订阅相关
-p: &p {type: http, interval: 42300, health-check: {enable: true, url: http://www.apple.com/library/test/success.html, interval: 300}}
+#节点分组
+  - {name: HK, <<: *a2, filter: "香|HK|(?i)Hong"           }             # a4更改为a2，即为手动选择
+  - {name: JP, <<:  *a2, filter: "日|东京|JP|(?i)Japan"     }             # a4更改为a2，即为手动选择     
+  - {name: TW, <<: *a2, filter: "台|湾|TW|(?i)Taiwan"      }             # a4更改为a2，即为手动选择
+  - {name: US, <<: *a2, filter: "美|US|(?i)States|American"}             # a4更改为a2，即为手动选择
+  - {name: SG, <<: *a2, filter: "新|坡|SG|(?i)Singapore"    }            # a4更改为a2，即为手动选择
 
-# 代理组相关
-g: &g {type: select, proxies: [HK, TW, SG, JP, US, DIRECT]}
-
-# m: &m {type: select, proxies: [DIRECT, Proxy, Auto, Fallback, HongKong, TaiWan, Singapore, Japan, America, Others]}
-
-proxies:   # 本地服务器
-
-# 订阅引用相关
-u: &u {type: select, use: [Subscribe]}
-
-proxy-providers: # 远程订阅
-  Subscribe: {<<: *p, path: ./proxy_providers/subscribe.yaml, url: "https://texon.io/portal/subscribe/1044/qZviaDqIahI/clash/"}
-# 1. 请使用Clash类型订阅链接填入引号""内使用,
-# 2. 或可使用通用订阅链接通过Sub-Store进行订阅转换(用于Stash)。
-
-proxy-groups:    # 代理组
-
-# 漏网之鱼
- - {name: Final, <<: *g}
-
-# YouTube
- - {name: YouTube, <<: *g}
-
-# NETFLIX
- - {name: NETFLIX, <<: *g}
-
-# Emby
- - {name: Emby, <<: *g}
-
-# 声田音乐
- - {name: Spotify, <<: *g}
-
-# 电报信息
- - {name: Telegram, <<: *g}
-
-# 谷歌服务
- - {name: Google, <<: *g}
-
-# 微软服务
- - {name: Microsoft, <<: *g}
-
- # 游戏平台
- - {name: Steam, <<: *g}
-
-# 香港节点
- - {name: HK, <<: *u, filter: "香|🇭🇰|HK|(?i)Hong"}
-
-# 台湾节点
- - {name: TW, <<: *u, filter: "台|🇨🇳|🇹🇼|湾|TW|(?i)Taiwan"}
-
-# 狮城节点
- - {name: SG, <<: *u, filter: "新|坡|狮城|🇸🇬|SG|(?i)Singapore"}
-
-# 日本节点
- - {name: JP, <<: *u, filter: "日|🇯🇵|东京|JP|(?i)Japan"}
-
-# 美国节点
- - {name: US, <<: *u, filter: "美|🇺🇲|US|(?i)States|American"}
-
-rule-providers: # 远程规则集
-
-# OpenAI
- OpenAI: {<<: *c, path: ./ruleset/OpenAI.yaml, url: https://cdn.jsdelivr.net/gh/Coldvvater/Mononoke@master/Stash/RuleSet/OpenAI.yaml}
-
-# 油管视频
- YouTube: {<<: *d, path: ./ruleset/YouTube.yaml, url: https://rules.kr328.app/youtube.yaml}
-
-# 奈飞视频
- Netflix: {<<: *d, path: ./ruleset/Netflix.yaml, url: https://rules.kr328.app/netflix.yaml}
-
-# 动画疯
- Bahamut: {<<: *d, path: ./ruleset/Bahamut.yaml, url: https://rules.kr328.app/bahamut.yaml}
-
-# 声田音乐
- Spotify: {<<: *d, path: ./ruleset/Spotify.yaml, url: https://rules.kr328.app/spotify.yaml}
-
-# 电报信息
- Telegram: {<<: *c, path: ./ruleset/Telegram.yaml, url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Telegram/Telegram_No_Resolve.yaml}
-
-# GitHub
- GitHub: {<<: *d, path: ./ruleset/GitHub.yaml, url: https://rules.kr328.app/github.yaml}
-
-# 谷歌服务
- Google: {<<: *d, path: ./ruleset/Google.yaml, url: https://rules.kr328.app/google.yaml}
-
-# 微软服务
- Microsoft: {<<: *d, path: ./ruleset/Microsoft.yaml, url: https://rules.kr328.app/microsoft.yaml}
-
-# 游戏平台
- Games: {<<: *d, path: ./ruleset/Games.yaml, url: https://rules.kr328.app/steam.yaml}
-
- #AD
- AD: {<<: *d, path: ./ruleset/AD.yaml, url: https://anti-ad.net/clash.yaml}
-
- # 国内网站
- China: {<<: *d, path: ./ruleset/China.yaml, url: https://rules.kr328.app/cn.yaml}
-
-# 国外网站
- Proxy: {<<: *d, path: ./ruleset/Proxy.yaml, url: https://cdn.jsdelivr.net/gh/Loyalsoldier/clash-rules@release/proxy.txt}
-
-rules: # 分流规则引用
-  - DOMAIN,rules.kr328.app,Final
+# 分流规则 
+rule-providers:
+  Direct:      {<<: *a5, url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Direct/Direct.yaml,                      path: ./ruleset/Direct.yaml       }
+  Lan:         {<<: *a6, url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Lan/Lan.yaml,                            path: ./ruleset/Lan.yaml          }
+  Ad:          {<<: *a5, url: https://anti-ad.net/clash.yaml,                                                                                     path: ./ruleset/anti-ad-clash.yaml}
+  OpenAi:      {<<: *a6, url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/OpenAI/OpenAI.yaml,                      path: ./ruleset/OpenAi.yaml       }
+  Bahamut:     {<<: *a6, url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Bahamut/Bahamut.yaml,                    path: ./ruleset/Bahamut.yaml      } 
+  Microsoft:   {<<: *a6, url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Microsoft/Microsoft.yaml,                path: ./ruleset/Microsoft.yaml    }
+  Google:      {<<: *a6, url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Google/Google.yaml,                      path: ./ruleset/Google.yaml       }
+  Telegram:    {<<: *a6, url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Telegram/Telegram.yaml,                  path: ./ruleset/Telegram.yaml     }
+  Game:        {<<: *a6, url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/Game/Game.yaml,                          path: ./ruleset/Game.yaml         }
+  ChinaIP:     {<<: *a7, url: https://cdn.jsdelivr.net/gh/soffchen/GeoIP2-CN@release/clash-rule-provider.yml,                                     path: ./ruleset/ChinaIP.yaml      }
+  ProxyLite:   {<<: *a6, url: https://cdn.jsdelivr.net/gh/blackmatrix7/ios_rule_script@master/rule/Clash/ProxyLite/ProxyLite.yaml,                path: ./ruleset/ProxyLite.yaml    }
+  
+ # 分流Policy 
+rules:
   - DOMAIN,pilipili-cf.emby77.org,Emby
   - DOMAIN,cdn.misakaf.org,Emby
-  - DOMAIN,nl.xmsl.org,Emby
-  - RULE-SET,AD,REJECT
-  - RULE-SET,OpenAI,US
-  - RULE-SET,YouTube,YouTube
-  - RULE-SET,Netflix,NETFLIX
-  - RULE-SET,Bahamut,HK
-  - RULE-SET,Spotify,Spotify
-  - RULE-SET,Telegram,Telegram
-  - RULE-SET,GitHub,HK
+  - RULE-SET,Direct,DIRECT
+  - RULE-SET,Lan,DIRECT
+  - RULE-SET,Ad,AdBlock
+  - RULE-SET,OpenAi,OpenAi
+  - RULE-SET,Microsoft, Fianl
+  - RULE-SET,Bahamut, Bahamut
   - RULE-SET,Google,Google
-  - RULE-SET,Microsoft,Microsoft
-  - RULE-SET,Games,Steam
-  - RULE-SET,Proxy,Final
-  - RULE-SET,China,DIRECT
+  - RULE-SET,Telegram,Telegram
+  - RULE-SET,Game,Steam
+  - RULE-SET,ProxyLite,Final
+  - RULE-SET,ChinaIP,DIRECT
   - GEOIP,CN,DIRECT
-  - MATCH,Final
+  - MATCH,Fianl
+
+
+# TUN模式是通过在操作系统上安装一个虚拟网卡来实现的，它可以接管所有的网络流量，并将流量转发至Clash，然后由Clash发出请求
+# Windows 系统中如何启用TUN模式
+# 1、运行 Clash For Windows, 确保使用规则模式，并可以联网
+# 2、点击 General中的Service Mode右侧的Manage按钮，在弹出窗口中选择schtasks，安装服务模式。安装完成后，应用程序会自动重启，Service Mode右侧的地球图标变为绿色表示安装成功
+# 3、点击 General中的TUN Mode右侧的开关以启动TUN模式
