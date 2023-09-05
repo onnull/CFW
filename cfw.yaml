@@ -123,7 +123,6 @@ rule-providers: # 远程规则集
  Games: {<<: *d, path: ./ruleset/Games.yaml, url: https://rules.kr328.app/steam.yaml}
 
  #AD
- # 游戏平台
  AD: {<<: *d, path: ./ruleset/AD.yaml, url: https://anti-ad.net/clash.yaml}
 
  # 国内网站
@@ -137,7 +136,7 @@ rules: # 分流规则引用
   - DOMAIN,pilipili-cf.emby77.org,Emby
   - DOMAIN,cdn.misakaf.org,Emby
   - DOMAIN,nl.xmsl.org,Emby
-  - RULE-SET,Ad,REJECT
+  - RULE-SET,AD,REJECT
   - RULE-SET,OpenAI,US
   - RULE-SET,YouTube,YouTube
   - RULE-SET,Netflix,NETFLIX
